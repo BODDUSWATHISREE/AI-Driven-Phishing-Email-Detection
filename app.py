@@ -124,26 +124,29 @@ async def home(request: Request):
 # -----------------------------
 @app.post("/predict")
 async def predict(data: EmailRequest):
+    try:
+        if not data.email.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Email cannot be empty."
+            )
 
-    if not data.email.strip():
+        cleaned = clean_email(data.email)
+        text_features = tfidf.transform([cleaned])
+        metadata = extract_metadata(data.email)
+        final_features = hstack([text_features, metadata.values])
+
+        prediction = model.predict(final_features)[0]
+        probability = float(model.predict_proba(final_features)[0][1])
+
+        return {
+            "prediction": "Phishing" if prediction == 1 else "Legitimate",
+            "probability": probability
+        }
+
+    except Exception as e:
+        print("Prediction Error:", e)
         raise HTTPException(
-            status_code=400,
-            detail="Email cannot be empty."
+            status_code=500,
+            detail="Prediction failed."
         )
-
-    cleaned = clean_email(data.email)
-
-    text_features = tfidf.transform([cleaned])
-
-    metadata = extract_metadata(data.email)
-
-    final_features = hstack([text_features, metadata.values])
-
-    prediction = model.predict(final_features)[0]
-
-    probability = float(model.predict_proba(final_features)[0][1])
-
-    return {
-        "prediction": "Phishing" if prediction == 1 else "Legitimate",
-        "probability": probability
-    }
